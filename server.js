@@ -2,30 +2,44 @@
 
 //-----My Dependencies-----//
 const express = require('express');
-const dotenv = require('dotenv');
 const cors = require('cors');
+const dotenv = require('dotenv').config();
 const getWeather = require('./weather.js');
 const getMovies = require('./movies.js');
 
 //-----My Config Server Stuff-----//
 const app = express();
-dotenv.config();
 app.use(cors());
-app.use(express.json());
+// dotenv.config();
 
 //-----Application Constants-----//
 const PORT = process.env.PORT || 3001
 
 //-----My Routes-----//
-app.get('/weather', getWeather);
-app.get('/movies', getMovies);
-app.get('*', notWorking);
+app.get('/weather', weatherHandler);
+app.get('/movies', movieHandler);
+app.use('*', errorHandler);
 
-//-----Route handler-----//
-function notWorking(req, res) {
-  res.status(500).send('Error 500: Unexpected error, please check your entry and try again');
+//-----Route handlers-----//
+
+function weatherHandler (req, res) {
+  const location = req.query.city;
+  
+  getWeather(location)
+  .then(forecastArr => res.send(forecastArr))
+}
+
+function movieHandler (req, res) {
+  const location = req.query.city;
+  
+  getMovies(location)
+    .then(moviesArr => res.send(moviesArr))
+}
+
+function errorHandler(req, res) {
+  res.status(404).send('Not Found: Please check your entry and try again');
   }
 
 app.listen(PORT, () => {
-  console.log(`Proof of life on port ${PORT}`);
+  console.log(`Up and running on ${PORT}`);
 });
