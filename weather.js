@@ -3,56 +3,44 @@
 const axios = require('axios');
 const cache = require('./cache.js');
 
-function getWeather(location) {
-  const key = 'forecast-' + location;
-  const url = `https://api.weatherbit.io/v2.0/forecast/daily?key=${process.env.REACT_APP_WEATHER_API_KEY}&city=${location}`;
-
-  if(!cache[key]) {
-    cache[key] = {};
-    cache[key].timestamp = Date.now();
-    cache[key].data = axios.get(url)
-      .then(data => parseWeatherData(data.data))
-  }
-  return cache[key].data;
-}
-
-function parseWeatherData(data) {
+async function getWeather(req, res) {
+  const lat = req.query.lat;
+  const lon = req.query.lon;
+  const searchQuery = req.query.searchQuery;
+  const key = 'weather-' + searchQuery;
+  const url = `https://api.weatherbit.io/v2.0/forecast/daily?key=${process.env.REACT_APP_WEATHER_API_KEY}&city=${searchQuery}&lat=${lat}&lon=${lon}`;
+  
   try {
-    const forecastArr = data.data.map(weather => {
-      return new Forecast(weather);
-    })
-return Promise.resolve(forecastArr);
-  } catch (err) {
-    return Promise.reject(err);
+
+    if(!cache[key]) {
+      cache[key] = {};
+      cache[key].timestamp = Date.now();
+      axios.get(url)
+        .then(data => {
+
+          class Forecast {
+            constructor(datetime, low_temp, high_temp, description) {
+              this.date = datetime;
+              this.lowtemp = low_temp;
+              this.hightemp = high_temp;
+              this.description = description;
+            }
+          }
+        
+          let weather = data;
+          let forecastArray = weather.data.data.map( (value, idx) => {
+            return new Forecast(`${value.datetime}`, `Today's low is ${value.low_temp}`, `with a high of ${value.high_temp}`, `and ${value.weather.description}`)
+          })
+        cache[key].data = forecastArray;
+        console.log(cache[key].data);
+        res.send(forecastArray);
+        })
+    }
+    else {
+      res.send(cache[key].data);}
+  } catch(error) {
+    res.status(500).send('Error: Please check your entry and try again', error);
   }
 }
-
-class Forecast {
-  constructor(weather) {
-    this.date = weather.datetime;
-    this.lowtemp = weather.low_temp;
-    this.hightemp = weather.high_temp;
-    this.description = weather.description;
-  }
-}
-// async function getWeather(req, res) {
-//   const lat = req.query.lat;
-//   const lon = req.query.lon;
-//   const searchQuery = req.query.searchQuery;
-//   const url = `https://api.weatherbit.io/v2.0/forecast/daily?key=${process.env.REACT_APP_WEATHER_API_KEY}&city=${searchQuery}`;
-  
-//   try {
-//     let weather = await axios.get(url);
-//     let forecastArray = [];
-//     weather.data.data.map( (value, idx) => {
-//       forecastArray.push(new Forecast(value.datetime, `Today's temp is ${value.temp}, with ${value.weather.description}`))
-//     })
-  
-//     res.status(200).send(forecastArray)
-//   } catch(err) {
-//     console.log('error info:', err);
-//   }
-// }
-
 
 module.exports = getWeather;
