@@ -3,59 +3,46 @@
 const axios = require('axios');
 const cache = require('./cache.js');
 
-function getMovies(location) {
-  const key = 'movies-' + location;
-  const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.REACT_APP_MOVIES_API_KEY}&query=${location}`;
+async function getMovies(req, res) {
+  const searchQuery = req.query.searchQuery;
+  const key = 'movies-' + searchQuery;
+  const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.REACT_APP_MOVIES_API_KEY}&query=${searchQuery}&page=1`;
+
+  try{
 
   if(!cache[key]) {
     cache[key] = {};
     cache[key].timestamp = Date.now();
-    cache[key].data = axios.get(url)
-      .then(data => parseMovieData(data.data))
+    axios.get(url)
+      .then(data => {
+        const topMovies = data.data.results;
+        const top20Movies = topMovies.sort((a,b) => b.popularity - a.popularity);
+        const newMoviesArray =[];
+
+        class Movie {
+          constructor(title, overview, vote_average, vote_count, poster_path, popularity, release_date) {
+            this.tableName = 'movies',
+            this.title = title,
+            this.overview = overview,
+            this.avgVotes = vote_average,
+            this.totalVotes = vote_count,
+            this.image_url = poster_path, //<--- Do I need something else in this object?
+            this.popularity = popularity,
+            this.releasedOn = release_date,
+            this.timestamp = Date.now()
+          }
+        }
+        for(let i=0; i<20; i++){
+          newMoviesArray.push(new Movie(top20Movies[i].title, top20Movies[i].overview, top20Movies[i].vote_average, top20Movies[i].vote_count, top20Movies[i].poster_path, top20Movies[i].popularity, top20Movies[i].release_date));
+        }
+        cache[key].data = newMoviesArray;
+        console.log(cache[key].data);
+        res.send(newMoviesArray);
+      });
+    } else {
+      res.send(cache[key].data);}
+  } catch(error) {
+    res.status(500).send('Error: Please check your entry and try again', error);
   }
-  return cache[key].data;
 }
-
-function parseMovieData(data) {
-  try {
-    const moviesArr = data.results.map(movie => {
-      return new Movie(movie);
-    })
-return Promise.resolve(moviesArr);
-  } catch (err) {
-    return Promise.reject(err);
-  }
-}
-
-class Movie {
-  constructor(movie) {
-    this.tableName = 'movies',
-    this.title = movie.title,
-    this.overview = movie.overview,
-    this.avgVotes = movie.vote_average,
-    this.totalVotes = movie.vote_count,
-    this.image_url = movie.poster_path, //<--- Do I need something else in this object?
-    this.popularity = movie.popularity,
-    this.releasedOn = movie.release_date,
-    this.timestamp = Date.now()
-  }
-}
-
-// function getMovies(req, res) {
-//   const searchQuery = req.query.searchQuery;
-//   const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.REACT_APP_MOVIES_API_KEY}&query=${searchQuery}`;
-
-//   try {
-//     let movies = await axios.get(url);
-//     let movieArray = [];
-//     movies.data.results.map( (value,idx) => { //<--- order of .data vs .results?
-//       movieArray.push(new Movie(value.title, value.popularity, value.image_url, value.description))
-//     })
- 
-//     res.status(200).send(moviesArray);
-//   } catch(err) {
-//     console.error(err);
-//     }
-// }
-
 module.exports = getMovies;
